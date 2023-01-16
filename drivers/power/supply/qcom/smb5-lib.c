@@ -23,6 +23,7 @@
 #include <linux/ktime.h>
 #ifdef CONFIG_MACH_XIAOMI_MOJITO
 #include <linux/usb/usbpd.h>
+#include <linux/moduleparam.h>
 #endif
 #ifdef CONFIG_REVERSE_CHARGE
 #include <linux/gpio.h>
@@ -53,6 +54,11 @@
 	((typec_mode == POWER_SUPPLY_TYPEC_SOURCE_MEDIUM	\
 	|| typec_mode == POWER_SUPPLY_TYPEC_SOURCE_HIGH)	\
 	&& (!chg->typec_legacy || chg->typec_legacy_use_rp_icl))
+
+#ifdef CONFIG_MACH_XIAOMI_MOJITO
+static bool skip_therm_chg = false;
+module_param(skip_therm_chg, bool, 0644);
+#endif
 
 static void update_sw_icl_max(struct smb_charger *chg, int pst);
 static int smblib_get_prop_typec_mode(struct smb_charger *chg);
@@ -2892,8 +2898,12 @@ int smblib_set_prop_system_temp_level(struct smb_charger *chg,
 
 	if (val->intval == chg->system_temp_level)
 		return 0;
-#endif
+
+	if (!skip_therm_chg)
+		chg->system_temp_level = val->intval;
+#else
 	chg->system_temp_level = val->intval;
+#endif
 
 	if (chg->system_temp_level == chg->thermal_levels)
 		return vote(chg->chg_disable_votable,
